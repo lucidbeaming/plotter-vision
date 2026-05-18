@@ -245,13 +245,6 @@
           oninput="camera_radius=+this.value; syncControl('zoom',this.value); computeEye(); reproject=true;"/>
       </div>
       <div class="row">
-        <label>Roll</label>
-        <input type="range" id="roll-slider" min="-180" max="180" value="0" step="1"
-          oninput="camera_roll=+this.value; syncControl('roll',this.value); computeEye(); reproject=true;"/>
-        <input type="number" class="val-input" id="roll-num" min="-180" max="180" value="0" step="1"
-          oninput="camera_roll=+this.value; syncControl('roll',this.value); computeEye(); reproject=true;"/>
-      </div>
-      <div class="row">
         <label>Pan X</label>
         <input type="range" id="pan-x-slider" min="-50" max="50" value="0" step="1"
           oninput="camera.lookat.x=+this.value; syncControl('pan-x',this.value); computeEye(); reproject=true;"/>

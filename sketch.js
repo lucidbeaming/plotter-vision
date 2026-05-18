@@ -45,7 +45,10 @@ reproject = false;
 let camera_psi = 0;
 let camera_theta = 0;
 let camera_radius = 100;
-let camera_roll = 0; // degrees, rotates camera around its view axis
+
+let orbit_active = false;
+let last_x = 0;
+let last_y = 0;
 
 function computeEye()
 {
@@ -66,31 +69,11 @@ function computeEye()
 	camera.eye.y = camera_radius * Math.sin(camera_theta) * Math.cos(camera_psi);
 	camera.eye.z = camera_radius * Math.cos(camera_theta);
 
-	// Reset up vector fully before applying roll (x/y may be non-zero from prior frame)
 	camera.up.x = 0;
 	camera.up.y = 0;
 	camera.up.z = camera_theta < 0 ? -1 : 1;
 
 	camera.eye.add(camera.lookat);
-
-	if (camera_roll !== 0) {
-		// Rotate the up vector around the view axis (eye → lookat) using
-		// Rodrigues' rotation formula: v' = v·cosθ + (k×v)·sinθ + k·(k·v)·(1−cosθ)
-		const angle = camera_roll * Math.PI / 180;
-		const dx = camera.lookat.x - camera.eye.x;
-		const dy = camera.lookat.y - camera.eye.y;
-		const dz = camera.lookat.z - camera.eye.z;
-		const dl = Math.sqrt(dx*dx + dy*dy + dz*dz);
-		const kx = dx/dl, ky = dy/dl, kz = dz/dl;
-		const uz = camera.up.z; // (0, 0, ±1)
-		const c = Math.cos(angle), s = Math.sin(angle);
-		const kdotv = kz * uz; // k · (0,0,uz)
-		const cvx = ky * uz, cvy = -kx * uz; // k × (0,0,uz), z-component is 0
-		camera.up.x = cvx*s + kx*kdotv*(1-c);
-		camera.up.y = cvy*s + ky*kdotv*(1-c);
-		camera.up.z = uz*c  + kz*kdotv*(1-c);
-	}
-
 	camera.update_matrix();
 
 	// duplicate for 3D (lookat is shared)
@@ -287,6 +270,23 @@ function keyTyped()
 }
 
 
+function mousePressed()
+{
+	// Only start orbit when the press lands inside the canvas area.
+	// Panel elements are outside the canvas bounds, so mouseX > width there.
+	if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height)
+	{
+		last_x = mouseX;
+		last_y = mouseY;
+		orbit_active = true;
+	}
+}
+
+function mouseReleased()
+{
+	orbit_active = false;
+}
+
 function mouseWheel(event)
 {
 	camera_radius = Math.max(20, Math.min(400, camera_radius + event.delta * 0.5));
@@ -310,6 +310,30 @@ function draw()
 {
 	if (!stl)
 		return;
+
+	// Orbit: drag on the canvas to rotate elevation and azimuth
+	if (orbit_active && mouseIsPressed)
+	{
+		const dx = mouseX - last_x;
+		const dy = mouseY - last_y;
+		last_x = mouseX;
+		last_y = mouseY;
+		if (dx !== 0 || dy !== 0)
+		{
+			camera_psi   += dx * 0.005;
+			camera_theta  = Math.max(0.01, Math.min(Math.PI - 0.01, camera_theta - dy * 0.005));
+			computeEye();
+			reproject = true;
+			if (typeof syncControl === 'function')
+			{
+				let pDeg = camera_psi * 180 / Math.PI;
+				while (pDeg >  180) pDeg -= 360;
+				while (pDeg < -180) pDeg += 360;
+				syncControl('theta', Math.round(camera_theta * 180 / Math.PI));
+				syncControl('psi',   Math.round(pDeg));
+			}
+		}
+	}
 
 	// if there are segments left to process, continue to force redraw
 	if (!stl || !(redraw || reproject))
