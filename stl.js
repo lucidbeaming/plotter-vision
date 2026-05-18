@@ -156,6 +156,19 @@ function STL(content)
 
 	this.done_coplanar = 0;
 	this.model_map = {};
+
+	// helper: (re)build model_map from current this.triangles
+	this._build_model_map = function() {
+		this.model_map = {};
+		for (const t of this.triangles) {
+			for (const p of t.model) {
+				const k = stl_key3d(p);
+				if (this.model_map[k]) this.model_map[k].push(t);
+				else this.model_map[k] = [t];
+			}
+		}
+	};
+
 	this._build_model_map();
 
 	// ── Mesh simplification via vertex clustering ──────────────
@@ -210,18 +223,6 @@ function STL(content)
 		this.triangles = tris;
 		this.done_coplanar = 0;
 		this._build_model_map();
-	};
-
-	// helper: (re)build model_map from current this.triangles
-	this._build_model_map = function() {
-		this.model_map = {};
-		for (const t of this.triangles) {
-			for (const p of t.model) {
-				const k = stl_key3d(p);
-				if (this.model_map[k]) this.model_map[k].push(t);
-				else this.model_map[k] = [t];
-			}
-		}
 	};
 
 	this.project = function(camera)
