@@ -121,7 +121,17 @@ function setup()
 	y_offset = height/2;
 
 	// Move the canvas so it’s inside our <div id="sketch-holder">.
-	canvas.parent('sketch-holder');
+	canvas.parent(‘sketch-holder’);
+
+	// Use native canvas events so HTML panel interactions don’t trigger rotation.
+	// p5.js registers mousePressed on document, not the canvas element, so any
+	// click on a slider or button would otherwise start a drag.
+	canvas.elt.addEventListener(‘mousedown’, (e) => {
+		last_x = e.offsetX;
+		last_y = e.offsetY;
+		canvas_drag = true;
+	});
+	document.addEventListener(‘mouseup’, () => { canvas_drag = false; });
 
 	//createCanvas(1000, 1080); // WEBGL?
 	background(0);
@@ -298,18 +308,6 @@ function keyTyped()
 }
 
 let canvas_drag = false;
-
-function mousePressed()
-{
-	last_x = mouseX;
-	last_y = mouseY;
-	canvas_drag = true;
-}
-
-function mouseReleased()
-{
-	canvas_drag = false;
-}
 
 function mouseWheel(event)
 {
