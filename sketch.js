@@ -16,6 +16,19 @@ let z_scale = 1;
 dark_mode = true;
 redblue_mode = false;
 
+// new controls
+let stroke_width = 1;
+let line_color = '#ffffff';
+let show_coplanar_edges = false;
+let min_area_threshold = 2;
+
+function parseHexColor(hex) {
+	const r = parseInt(hex.slice(1,3), 16);
+	const g = parseInt(hex.slice(3,5), 16);
+	const b = parseInt(hex.slice(5,7), 16);
+	return [r, g, b];
+}
+
 // blue color suggested by https://mastodon.sdf.org/@elb/105351977660915938
 red_color = 0xff0000;
 blue_color = 0x14ecfc;
@@ -103,7 +116,7 @@ function loadBytes(file, callback) {
 
 function setup()
 {
-	let canvas = createCanvas(windowWidth-10, windowHeight-30); // WEBGL?
+	let canvas = createCanvas(windowWidth, windowHeight);
 	x_offset = width/2;
 	y_offset = height/2;
 
@@ -296,7 +309,7 @@ function mouseWheel(event)
 }
  
 function windowResized() {
-	resizeCanvas(windowWidth-10, windowHeight-30);
+	resizeCanvas(windowWidth, windowHeight);
 	camera.width = width;
 	camera.height = height;
 	x_offset = width/2;
@@ -405,7 +418,7 @@ function draw()
 	scale(z_scale);
 
 	// draw all of our in-processing segments lightly
-	strokeWeight(1);
+	strokeWeight(stroke_width);
 	if (redblue_mode)
 		stroke(200,0,200,100);
 	else
@@ -413,7 +426,7 @@ function draw()
 	for(let s of stl.segments)
 		v3_line(s.p0, s.p1);
 
-	if (verbose)
+	if (show_coplanar_edges)
 	{
 		stroke(100,0,0,100);
 		for(let s of stl.coplanar)
@@ -434,11 +447,8 @@ function draw()
 	}
 
 	// Draw all of our visible segments sharply
-	strokeWeight(1);
-	if (dark_mode)
-		stroke(255,255,255);
-	else
-		stroke(0,0,0);
+	strokeWeight(stroke_width);
+	stroke(...parseHexColor(line_color));
 
 	if (redblue_mode)
 	{

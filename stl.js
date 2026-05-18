@@ -205,7 +205,7 @@ function STL(content)
 		// if the triangle is less than a pixel of screen,
 		// drop it.  this might cause problems with very fine
 		// detailed meshed, but those aren't good for plotting.
-		if (t.area() < 2)
+		if (t.area() < min_area_threshold)
 		{
 			//console.log(t, "filtered area", t.area());
 			return;

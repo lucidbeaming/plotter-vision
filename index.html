@@ -1,117 +1,448 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>STL to SVG: Hidden wire frame removal</title>
-    <meta name="viewport" width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0>
-    <style> body {padding: 0; margin: 0;} </style>
-    <script src="p5/p5.min.js"></script>
-    <script src="p5/addons/p5.dom.min.js"></script>
-    <script src="p5/addons/p5.sound.min.js"></script>
-    <script src="stl.js"></script>
-    <script src="camera.js"></script>
-    <script src="triangle.js"></script>
-    <script src="hidden.js"></script>
-    <script src="sketch.js"></script>
+<head>
+  <title>plotter.vision — STL to SVG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+  <style>
+    * { box-sizing: border-box; }
 
-<meta property="og:title" content="Hidden Wireframe Removal">
-<meta property="og:site_name" content="Trammell Hudson's Projects">
-<meta property="og:url" content="https://trmm.net/Plotter-Vision/">
-<meta property="og:description" content="Tools for generating wireframe 2D SVG images of 3D STL files, suitable for plotting.">
-<meta property="og:image" content="https://live.staticflickr.com/4472/37526022032_d7afc7358d.jpg">
-  </head>
-  <body>
-<form id="uploadForm">
-<input id="fileUpload" name="files[]" style="display:none;" type="file"/>
-<input type="button" id="loadFileXml" value="Upload STL" onclick="document.getElementById('fileUpload').click();" />
-<input id="fileDownload" type="button" value="Download SVG" onclick="download()"/>
-<input type="button" value="Light/Dark" onclick="
-	dark_mode=!dark_mode;
-	redraw=true;"
-/>
-<input type="button" value="Red/Blue 3D" onclick="
-	redblue_mode=!redblue_mode;
-	reproject=true;
-	eye_separation_slider.style.display = redblue_mode ? '' : 'none';
-"/>
-<input id="eye_separation_slider" type="range" style="display:none" min="1" max="60" value="20" oninput="
-	console.log(eye_separation, this);
-	eye_separation=this.value/10;
-	computeEye();
-	reproject=true;
-" />
-<span align=right>
-More info: <a href="https://trmm.net/Plotter-Vision/">trmm.net/Plotter-Vision</a></span>
-</form>
-<div id="sketch-holder">
-      <!-- Our sketch will go here! -->
-</div>
+    body {
+      padding: 0; margin: 0;
+      background: #000;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
 
-<script>
-let filename = "plotter.stl";
+    #sketch-holder {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
 
-document.forms['uploadForm'].elements['fileUpload'].onchange = (evt) => {
-	const reader = new FileReader();
-	console.log("upload changed", evt);
-	reader.onloadend = (evt) => {
-		console.log(evt.target);
-		const content = evt.target.result;
-		if (!content)
-			return;
+    /* ── Panel ─────────────────────────────────────────────── */
+    #panel {
+      position: fixed;
+      top: 0; right: 0;
+      width: 256px;
+      height: 100vh;
+      background: rgba(16, 16, 16, 0.93);
+      backdrop-filter: blur(10px);
+      border-left: 1px solid rgba(255,255,255,0.08);
+      color: #d8d8d8;
+      font-size: 12px;
+      overflow-y: auto;
+      z-index: 100;
+      transition: transform 0.2s ease;
+    }
 
-		//console.log("content:", raw);
-		stl = new STL(content);
-		stl2 = new STL(content);
-		//console.log("new stl:", stl);
-		reproject = true;
-	};
+    #panel.collapsed { transform: translateX(246px); }
 
-	let file = evt.target.files[0];
-	filename = file.name;
+    #panel-toggle {
+      position: fixed;
+      top: 10px; right: 10px;
+      width: 30px; height: 30px;
+      background: rgba(16,16,16,0.85);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #aaa;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      z-index: 101;
+      font-size: 15px;
+      user-select: none;
+    }
 
-	console.log("uploading " + filename);
+    #panel-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
 
-	reader.readAsArrayBuffer(file);
-};
+    /* ── Sections ──────────────────────────────────────────── */
+    .section {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
 
-function download()
-{	
-	let svg = "";
-	svg += "<?xml version='1.0'?>\n";
-	svg += "<svg xmlns='http://www.w3.org/2000/svg' version='1.2' baseProfile='tiny' width='" + width + "px' height='" + height + "px'>\n";
-	svg += "<desc>plotter.vision</desc>";
+    .section h3 {
+      margin: 0 0 8px 0;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #555;
+    }
 
-	if (redblue_mode)
-		svg += "<g id='layer1' inkscape:groupmode='layer' inkscape:label='Red'>\n"
+    /* ── Rows ──────────────────────────────────────────────── */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 5px 0;
+    }
 
-	svg += "<path d='\n";
-	svg += stl.svg_path();
-	svg += "' style='stroke:#ff0000;stroke-width:1;fill:none'/>";
+    .row label {
+      flex: 1;
+      color: #999;
+      white-space: nowrap;
+    }
 
-	if (redblue_mode)
-	{
-		svg += "\n</g>\n<g id='layer2' inkscape:groupmode='layer' inkscape:label='Blue'>\n"
-		svg += "<path d='\n";
-		svg += stl2.svg_path();
-		svg += "' style='stroke:#0000ff;stroke-width:1;fill:none'/>";
-		svg += "\n</g>\n";
-	}
+    .val {
+      min-width: 28px;
+      text-align: right;
+      color: #666;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
 
-	svg += "</svg>";
+    /* ── Buttons ───────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      padding: 4px 10px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      color: #ccc;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+    }
 
-	svg = encodeURIComponent(svg);
+    .btn:hover { background: rgba(255,255,255,0.13); color: #fff; }
 
-	var element = document.createElement('a');
-	element.setAttribute('href', 'data:image/svg+xml;charset=utf-8,' + svg);
+    .btn.on {
+      background: rgba(74,158,255,0.18);
+      border-color: rgba(74,158,255,0.45);
+      color: #5aabff;
+    }
 
-	// attempt to reuse their filename
-	let svgname = filename.replace(/\.stl$/, "");
-	element.setAttribute('download', svgname + ".svg");
+    .btn-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 5px 0; }
 
-	element.style.display = 'none';
-	document.body.appendChild(element);
-	element.click();
-	document.body.removeChild(element);
-}
-</script>
-  </body>
+    .btn-full { width: 100%; padding: 6px; margin: 2px 0; }
+
+    /* ── Inputs ────────────────────────────────────────────── */
+    input[type="range"] {
+      flex: 1;
+      height: 3px;
+      accent-color: #4a9eff;
+      cursor: pointer;
+    }
+
+    input[type="color"] {
+      width: 30px; height: 22px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 3px;
+      background: none;
+      cursor: pointer;
+      padding: 1px;
+    }
+
+    input[type="number"], select {
+      width: 72px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #ccc;
+      border-radius: 3px;
+      padding: 3px 6px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+
+    select option { background: #1a1a1a; }
+
+    /* ── Light-mode overrides ──────────────────────────────── */
+    body.light {
+      background: #f0f0f0;
+    }
+
+    body.light #panel {
+      background: rgba(238,238,238,0.95);
+      border-left-color: rgba(0,0,0,0.09);
+      color: #333;
+    }
+
+    body.light .section h3 { color: #aaa; }
+    body.light .row label  { color: #666; }
+    body.light .val        { color: #aaa; }
+
+    body.light .btn {
+      background: rgba(0,0,0,0.05);
+      border-color: rgba(0,0,0,0.1);
+      color: #444;
+    }
+    body.light .btn:hover { background: rgba(0,0,0,0.1); color: #111; }
+    body.light .btn.on {
+      background: rgba(0,100,255,0.1);
+      border-color: rgba(0,100,255,0.35);
+      color: #0055cc;
+    }
+
+    body.light input[type="number"],
+    body.light select {
+      background: rgba(0,0,0,0.05);
+      border-color: rgba(0,0,0,0.1);
+      color: #333;
+    }
+    body.light select option { background: #eee; }
+
+    body.light #panel-toggle {
+      background: rgba(238,238,238,0.9);
+      border-color: rgba(0,0,0,0.12);
+      color: #555;
+    }
+  </style>
+
+  <script src="p5/p5.min.js"></script>
+  <script src="p5/addons/p5.dom.min.js"></script>
+  <script src="p5/addons/p5.sound.min.js"></script>
+  <script src="stl.js"></script>
+  <script src="camera.js"></script>
+  <script src="triangle.js"></script>
+  <script src="hidden.js"></script>
+  <script src="sketch.js"></script>
+
+  <meta property="og:title" content="Hidden Wireframe Removal">
+  <meta property="og:site_name" content="Trammell Hudson's Projects">
+  <meta property="og:url" content="https://trmm.net/Plotter-Vision/">
+  <meta property="og:description" content="Tools for generating wireframe 2D SVG images of 3D STL files, suitable for plotting.">
+  <meta property="og:image" content="https://live.staticflickr.com/4472/37526022032_d7afc7358d.jpg">
+</head>
+<body>
+  <div id="sketch-holder"></div>
+  <div id="panel-toggle" onclick="togglePanel()" title="Toggle panel">☰</div>
+
+  <div id="panel">
+
+    <!-- FILE ──────────────────────────────────────────────── -->
+    <div class="section">
+      <h3>File</h3>
+      <input id="fileUpload" type="file" accept=".stl" style="display:none"/>
+      <button class="btn btn-full" onclick="document.getElementById('fileUpload').click()">↑  Upload STL</button>
+      <button class="btn btn-full" onclick="download()">↓  Download SVG</button>
+    </div>
+
+    <!-- CAMERA ────────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Camera</h3>
+      <div class="btn-row">
+        <button class="btn" onclick="cameraPreset('front')">Front</button>
+        <button class="btn" onclick="cameraPreset('right')">Right</button>
+        <button class="btn" onclick="cameraPreset('back')">Back</button>
+        <button class="btn" onclick="cameraPreset('left')">Left</button>
+        <button class="btn" onclick="cameraPreset('top')">Top</button>
+        <button class="btn" onclick="cameraPreset('iso')">Iso</button>
+      </div>
+      <div class="row">
+        <label>Zoom</label>
+        <input type="range" id="zoom-slider" min="20" max="400" value="170"
+          oninput="camera_radius=+this.value; document.getElementById('zoom-val').textContent=this.value; computeEye(); reproject=true;"/>
+        <span class="val" id="zoom-val">170</span>
+      </div>
+    </div>
+
+    <!-- LINE STYLE ────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Line Style</h3>
+      <div class="row">
+        <label>Color</label>
+        <input type="color" id="stroke-color" value="#ffffff"
+          oninput="line_color=this.value; redraw=true;"/>
+      </div>
+      <div class="row">
+        <label>Width</label>
+        <input type="range" min="1" max="60" value="10" step="1"
+          oninput="stroke_width=this.value/10; document.getElementById('sw-val').textContent=(stroke_width).toFixed(1); redraw=true;"/>
+        <span class="val" id="sw-val">1.0</span>
+      </div>
+      <div class="row">
+        <label>Dark background</label>
+        <button class="btn on" id="dark-btn"
+          onclick="dark_mode=!dark_mode;
+                   this.classList.toggle('on', dark_mode);
+                   this.textContent = dark_mode ? 'On' : 'Off';
+                   document.body.classList.toggle('light', !dark_mode);
+                   line_color = dark_mode ? '#ffffff' : '#000000';
+                   document.getElementById('stroke-color').value = line_color;
+                   redraw=true;">On</button>
+      </div>
+    </div>
+
+    <!-- 3D MODE ───────────────────────────────────────────── -->
+    <div class="section">
+      <h3>3D Mode</h3>
+      <div class="row">
+        <label>Red / Blue</label>
+        <button class="btn" id="redblue-btn"
+          onclick="redblue_mode=!redblue_mode;
+                   this.classList.toggle('on', redblue_mode);
+                   this.textContent = redblue_mode ? 'On' : 'Off';
+                   document.getElementById('eye-row').style.display = redblue_mode ? 'flex' : 'none';
+                   reproject=true;">Off</button>
+      </div>
+      <div class="row" id="eye-row" style="display:none">
+        <label>Eye sep.</label>
+        <input type="range" min="1" max="60" value="20"
+          oninput="eye_separation=this.value/10; document.getElementById('eye-val').textContent=(eye_separation).toFixed(1); computeEye(); reproject=true;"/>
+        <span class="val" id="eye-val">2.0</span>
+      </div>
+    </div>
+
+    <!-- RENDERING ─────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Rendering</h3>
+      <div class="row">
+        <label>Min triangle area</label>
+        <input type="range" min="1" max="200" value="2"
+          oninput="min_area_threshold=+this.value; document.getElementById('area-val').textContent=this.value; reproject=true;"/>
+        <span class="val" id="area-val">2</span>
+      </div>
+      <div class="row">
+        <label>Coplanar edges</label>
+        <button class="btn" id="coplanar-btn"
+          onclick="show_coplanar_edges=!show_coplanar_edges;
+                   this.classList.toggle('on', show_coplanar_edges);
+                   this.textContent = show_coplanar_edges ? 'On' : 'Off';
+                   redraw=true;">Off</button>
+      </div>
+    </div>
+
+    <!-- EXPORT ────────────────────────────────────────────── -->
+    <div class="section">
+      <h3>Export</h3>
+      <div class="row">
+        <label>Paper size</label>
+        <select id="paper-size">
+          <option value="canvas">Canvas (px)</option>
+          <option value="a4p">A4 Portrait</option>
+          <option value="a4l">A4 Landscape</option>
+          <option value="a3p">A3 Portrait</option>
+          <option value="a3l">A3 Landscape</option>
+          <option value="letter">Letter</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Margin (mm)</label>
+        <input type="number" id="export-margin" value="10" min="0" max="80" step="1"/>
+      </div>
+      <div class="row">
+        <label>Scale (%)</label>
+        <input type="number" id="export-scale" value="100" min="10" max="200" step="5"/>
+      </div>
+    </div>
+
+  </div><!-- /panel -->
+
+  <script>
+  let filename = "plotter.stl";
+
+  // ── File upload ─────────────────────────────────────────────
+  document.getElementById('fileUpload').onchange = (evt) => {
+    const reader = new FileReader();
+    reader.onloadend = (evt) => {
+      const content = evt.target.result;
+      if (!content) return;
+      stl  = new STL(content);
+      stl2 = new STL(content);
+      reproject = true;
+    };
+    const file = evt.target.files[0];
+    filename = file.name;
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ── Panel toggle ────────────────────────────────────────────
+  function togglePanel() {
+    document.getElementById('panel').classList.toggle('collapsed');
+  }
+
+  // ── Camera presets ──────────────────────────────────────────
+  function cameraPreset(view) {
+    const p = {
+      front: [90,   0],
+      right: [90,  90],
+      back:  [90, 180],
+      left:  [90, 270],
+      top:   [ 1,   1],
+      iso:   [55, -135],
+    };
+    const [theta, psi] = p[view];
+    cameraView(theta, psi);
+  }
+
+  // ── Paper sizes (mm) ────────────────────────────────────────
+  const PAPER = {
+    a4p:    { w: 210,   h: 297   },
+    a4l:    { w: 297,   h: 210   },
+    a3p:    { w: 297,   h: 420   },
+    a3l:    { w: 420,   h: 297   },
+    letter: { w: 215.9, h: 279.4 },
+  };
+
+  // ── Download ────────────────────────────────────────────────
+  function download() {
+    const paperKey   = document.getElementById('paper-size').value;
+    const marginMM   = parseFloat(document.getElementById('export-margin').value) || 10;
+    const scalePct   = parseFloat(document.getElementById('export-scale').value)  || 100;
+    const scaleF     = scalePct / 100;
+    const strokeColor = line_color;
+
+    const inkscape = "xmlns:inkscape='http://www.inkscape.org/namespaces/inkscape'";
+    let svg = "<?xml version='1.0'?>\n";
+
+    const pathStyle = (color) =>
+      `stroke:${color};stroke-width:${stroke_width};fill:none`;
+
+    if (paperKey === 'canvas') {
+      svg += `<svg xmlns='http://www.w3.org/2000/svg' ${inkscape} version='1.2' baseProfile='tiny' width='${width}px' height='${height}px'>\n`;
+      svg += "<desc>plotter.vision</desc>\n";
+
+      if (redblue_mode) svg += "<g id='layer1' inkscape:groupmode='layer' inkscape:label='Red'>\n";
+      svg += `<path d='\n${stl.svg_path()}\n' style='${pathStyle(strokeColor)}'/>\n`;
+      if (redblue_mode) {
+        svg += "</g>\n<g id='layer2' inkscape:groupmode='layer' inkscape:label='Blue'>\n";
+        svg += `<path d='\n${stl2.svg_path()}\n' style='${pathStyle('#0000ff')}'/>\n`;
+        svg += "</g>\n";
+      }
+    } else {
+      const paper = PAPER[paperKey];
+      const pw = paper.w, ph = paper.h;
+      const contentW = (pw - 2 * marginMM) * scaleF;
+      const contentH = (ph - 2 * marginMM) * scaleF;
+      const fit = Math.min(contentW / width, contentH / height);
+      const drawW = width * fit, drawH = height * fit;
+      const ox = marginMM + (contentW - drawW) / 2;
+      const oy = marginMM + (contentH - drawH) / 2;
+      // stroke-width needs to be in mm units (inverse-scaled from px)
+      const sw = (stroke_width / fit).toFixed(4);
+      const xform = `translate(${ox.toFixed(3)},${oy.toFixed(3)}) scale(${fit.toFixed(6)})`;
+
+      svg += `<svg xmlns='http://www.w3.org/2000/svg' ${inkscape} version='1.2' width='${pw}mm' height='${ph}mm' viewBox='0 0 ${pw} ${ph}'>\n`;
+      svg += "<desc>plotter.vision</desc>\n";
+
+      const wrapLayer = (id, label, color, path) =>
+        `<g id='${id}' inkscape:groupmode='layer' inkscape:label='${label}'>\n` +
+        `<g transform='${xform}'>\n` +
+        `<path d='\n${path}\n' style='stroke:${color};stroke-width:${sw};fill:none'/>\n` +
+        `</g></g>\n`;
+
+      if (redblue_mode) {
+        svg += wrapLayer('layer1', 'Red',  strokeColor, stl.svg_path());
+        svg += wrapLayer('layer2', 'Blue', '#0000ff',   stl2.svg_path());
+      } else {
+        svg += `<g transform='${xform}'>\n`;
+        svg += `<path d='\n${stl.svg_path()}\n' style='stroke:${strokeColor};stroke-width:${sw};fill:none'/>\n`;
+        svg += "</g>\n";
+      }
+    }
+
+    svg += "</svg>";
+
+    const el = document.createElement('a');
+    el.setAttribute('href', 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+    el.setAttribute('download', filename.replace(/\.stl$/i, '') + '.svg');
+    el.style.display = 'none';
+    document.body.appendChild(el);
+    el.click();
+    document.body.removeChild(el);
+  }
+  </script>
+</body>
 </html>
