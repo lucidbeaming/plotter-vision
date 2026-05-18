@@ -13,12 +13,12 @@
 let x_offset;
 let y_offset;
 let z_scale = 1;
-dark_mode = true;
+dark_mode = false;
 redblue_mode = false;
 
 // new controls
 let stroke_width = 1;
-let line_color = '#ffffff';
+let line_color = '#000000';
 let show_coplanar_edges = false;
 let min_area_threshold = 2;
 

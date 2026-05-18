@@ -205,7 +205,7 @@
   <meta property="og:description" content="Tools for generating wireframe 2D SVG images of 3D STL files, suitable for plotting.">
   <meta property="og:image" content="https://live.staticflickr.com/4472/37526022032_d7afc7358d.jpg">
 </head>
-<body>
+<body class="light">
   <div id="sketch-holder"></div>
   <div id="panel-toggle" onclick="togglePanel()" title="Toggle panel">☰</div>
 
@@ -243,7 +243,7 @@
       <h3>Line Style</h3>
       <div class="row">
         <label>Color</label>
-        <input type="color" id="stroke-color" value="#ffffff"
+        <input type="color" id="stroke-color" value="#000000"
           oninput="line_color=this.value; redraw=true;"/>
       </div>
       <div class="row">
@@ -254,14 +254,14 @@
       </div>
       <div class="row">
         <label>Dark background</label>
-        <button class="btn on" id="dark-btn"
+        <button class="btn" id="dark-btn"
           onclick="dark_mode=!dark_mode;
                    this.classList.toggle('on', dark_mode);
                    this.textContent = dark_mode ? 'On' : 'Off';
                    document.body.classList.toggle('light', !dark_mode);
                    line_color = dark_mode ? '#ffffff' : '#000000';
                    document.getElementById('stroke-color').value = line_color;
-                   redraw=true;">On</button>
+                   redraw=true;">Off</button>
       </div>
     </div>
 
