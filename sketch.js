@@ -116,12 +116,12 @@ function loadBytes(file, callback) {
 
 function setup()
 {
-	const holder = document.getElementById(‘sketch-holder’);
+	const holder = document.getElementById('sketch-holder');
 	let canvas = createCanvas(holder.offsetWidth, holder.offsetHeight);
 	x_offset = width/2;
 	y_offset = height/2;
 
-	canvas.parent(‘sketch-holder’);
+	canvas.parent('sketch-holder');
 
 	background(0);
 
