@@ -179,6 +179,7 @@ function STL(content)
 
 	this.project = function(camera)
 	{
+		camera.generation++;
 		this.screen_map = {};
 		this.visible_segments = [];
 		this.segments = [];

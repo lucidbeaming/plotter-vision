@@ -297,10 +297,18 @@ function keyTyped()
 	}
 }
 
+let canvas_drag = false;
+
 function mousePressed()
 {
 	last_x = mouseX;
 	last_y = mouseY;
+	canvas_drag = true;
+}
+
+function mouseReleased()
+{
+	canvas_drag = false;
 }
 
 function mouseWheel(event)
@@ -322,7 +330,7 @@ function draw()
 	if (!stl)
 		return;
 
-	if (mouseIsPressed && mouseY >= 0)
+	if (canvas_drag && mouseIsPressed && mouseY >= 0)
 	{
 		vx = (mouseX - last_x) * 0.5;
 		vy = (mouseY - last_y) * 0.5;
