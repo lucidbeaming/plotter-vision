@@ -116,11 +116,11 @@ function loadBytes(file, callback) {
 
 function setup()
 {
-	let canvas = createCanvas(windowWidth, windowHeight);
+	const holder = document.getElementById(‘sketch-holder’);
+	let canvas = createCanvas(holder.offsetWidth, holder.offsetHeight);
 	x_offset = width/2;
 	y_offset = height/2;
 
-	// Move the canvas so it’s inside our <div id="sketch-holder">.
 	canvas.parent(‘sketch-holder’);
 
 	background(0);
@@ -296,29 +296,21 @@ function keyTyped()
 	}
 }
 
-let canvas_drag = false;
-
-// Attached at script load, not inside setup(), so p5.js lifecycle is untouched.
-// Check event.target so only clicks that land on the canvas start a drag;
-// clicks on panel sliders/buttons leave canvas_drag false.
-document.addEventListener('mousedown', (e) => {
-	if (e.target.tagName === 'CANVAS') {
-		last_x = e.offsetX;
-		last_y = e.offsetY;
-		canvas_drag = true;
-	} else {
-		canvas_drag = false;
-	}
-});
-document.addEventListener('mouseup', () => { canvas_drag = false; });
 
 function mouseWheel(event)
 {
 	vz = event.delta * 0.5;
 }
  
+function mousePressed()
+{
+	last_x = mouseX;
+	last_y = mouseY;
+}
+
 function windowResized() {
-	resizeCanvas(windowWidth, windowHeight);
+	const holder = document.getElementById('sketch-holder');
+	resizeCanvas(holder.offsetWidth, holder.offsetHeight);
 	camera.width = width;
 	camera.height = height;
 	x_offset = width/2;
@@ -331,7 +323,7 @@ function draw()
 	if (!stl)
 		return;
 
-	if (canvas_drag && mouseIsPressed && mouseY >= 0)
+	if (mouseIsPressed && mouseY >= 0)
 	{
 		vx = (mouseX - last_x) * 0.5;
 		vy = (mouseY - last_y) * 0.5;
