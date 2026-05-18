@@ -194,7 +194,7 @@ function Triangle(p0, p1, p2)
 	// and the screen Z of the point on the triangle
 	// this can be used to determine if a point is inside or outside
 	// of a triangle
-	this.bary_coord = function (p)
+	this.bary_coord = function (p, out)
 	{
 		let t1 = this.t1;
 		let t2 = this.t2;
@@ -205,11 +205,9 @@ function Triangle(p0, p1, p2)
 		let a = (px * t2.y - py * t2.x) / d;
 		let b = (py * t1.x - px * t1.y) / d;
 
-		return createVector(
-			a,
-			b,
-			this.screen[0].z + a * t1.z + b * t2.z,
-		);
+		out.x = a;
+		out.y = b;
+		out.z = this.screen[0].z + a * t1.z + b * t2.z;
 	}
 
 	// compute the area of the triangle in screen coordinates

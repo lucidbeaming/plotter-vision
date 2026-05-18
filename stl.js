@@ -5,7 +5,9 @@
  * and doing hidden-line removal.
  */
 
-const stl_key2d_scale = 16;
+const stl_key2d_scale  = 16;
+const stl_key2d_offset = 4096; // supports ±4096 cells (±65536px)
+const stl_key2d_span   = 8192;
 
 function stl_key3d(p)
 {
@@ -180,6 +182,7 @@ function STL(content)
 		this.screen_map = {};
 		this.visible_segments = [];
 		this.segments = [];
+		this.seg_head = 0;
 		this.coplanar = [];
 
 		// project the triangles into the screen mapping
@@ -253,7 +256,7 @@ function STL(content)
 		{
 			for(let y=min_key_y ; y <= max_key_y ; y++)
 			{
-				let key = x + "," + y;
+				let key = (x + stl_key2d_offset) * stl_key2d_span + (y + stl_key2d_offset);
 				if (this.screen_map[key])
 					this.screen_map[key].push(t);
 				else
@@ -293,8 +296,7 @@ function STL(content)
 	// only processes some of the segments per call.
 	this.do_hidden = function(camera,ms)
 	{
-		let num_segments = this.segments.length;
-		if (num_segments == 0)
+		if (this.seg_head >= this.segments.length)
 			return false;
 
 		let start_time = performance.now();
@@ -303,9 +305,9 @@ function STL(content)
 		// line segments if they are not dragging
 		let count = 0;
 
-		while(this.segments.length != 0)
+		while(this.seg_head < this.segments.length)
 		{
-			let s = this.segments.shift();
+			let s = this.segments[this.seg_head++];
 			let visible_segment = hidden_wire(s, this.screen_map, this.segments);
 			if (visible_segment)
 				this.visible_segments.push(visible_segment);

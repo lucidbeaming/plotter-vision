@@ -14,8 +14,14 @@ const tri_clipped = 3; // occlusion and either p0 or p1 has been updated
 const tri_split = 4; //  occlusion and p0/p1 have been updated and p2/p3 have been created
 const EPS = 0.0000001;
 
-let p_max = null;
-let p_min = null;
+// pre-allocated scratch objects — never allocated in the hot loop
+const p_max = {x:0, y:0, z:0};
+const p_min = {x:0, y:0, z:0};
+const _tp0  = {x:0, y:0, z:0};
+const _tp1  = {x:0, y:0, z:0};
+const _intercept_s = [{x:0,y:0,z:0}, {x:0,y:0,z:0}, {x:0,y:0,z:0}];
+const _intercept_t = [{x:0,y:0,z:0}, {x:0,y:0,z:0}, {x:0,y:0,z:0}];
+function copyVec(v) { return {x:v.x, y:v.y, z:v.z}; }
 
 function occlude(t,s,work_queue)
 {
@@ -29,9 +35,6 @@ function occlude(t,s,work_queue)
 	let seg_len = dist2(s.p1, s.p0);
 	if (seg_len < 1)
 		return tri_hidden;
-
-	if (!p_max) p_max = createVector();
-	if (!p_min) p_min = createVector();
 
 	v3max(p_max, s.p0, s.p1);
 	v3min(p_min, s.p0, s.p1);
@@ -52,20 +55,20 @@ function occlude(t,s,work_queue)
 
 	// there is a chance this segment crosses the triangle,
 	// so compute the barycentric coordinates in triangle space
-	let tp0 = t.bary_coord(s.p0);
-	let tp1 = t.bary_coord(s.p1);
+	t.bary_coord(s.p0, _tp0);
+	t.bary_coord(s.p1, _tp1);
 
 	// if both are inside and not both on the same edge
 	// (which would indicate that this segment came from this
 	// triangle), then it is totally occluded
-	if (inside(tp0) && inside(tp1))
+	if (inside(_tp0) && inside(_tp1))
 	{
 		// if the segment z is closer than the triangle z
 		// then the segment is in front of the triangle
 		// equality check in case the segment shares a vertex
 		// with the triangle.  If it is coming towards the
 		// camera in the other point, the no occlusion.
-		if (s.p0.z < tp0.z+EPS && s.p1.z < tp1.z+EPS)
+		if (s.p0.z < _tp0.z+EPS && s.p1.z < _tp1.z+EPS)
 			return tri_no_occlusion;
 
 		// this segment either punctures the triangle
@@ -76,30 +79,25 @@ function occlude(t,s,work_queue)
 	// one or neither of the points are totally occluded
 	// so find where the extended triangle edge lines intersect
 	// the extended segment line.
-	let ratios = [];
-	let intercept_s = [];
-	let intercept_t = [];
 	let intercepts = 0;
 
 	for(let i = 0 ; i < 3 ; i++)
 	{
-		let [ratio, is, it] = intercept_lines(
-			s.p0,
-			s.p1,
-			t.screen[i],
-			t.screen[(i+1) % 3],
+		const ratio = intercept_lines(
+			s.p0, s.p1,
+			t.screen[i], t.screen[(i+1) % 3],
+			_intercept_s[intercepts],
+			_intercept_t[intercepts],
 		);
 		if (ratio < 0)
 			continue;
 
 		// if the segment intercept is closer than the triangle
 		// intercept, then this does not count as an intersection
-		if (is.z <= it.z)
+		if (_intercept_s[intercepts].z <= _intercept_t[intercepts].z)
 			continue;
 
 		intercepts++;
-		intercept_s.push(is);
-		intercept_t.push(it);
 	}
 
 	let original_intercepts = intercepts;
@@ -113,18 +111,23 @@ function occlude(t,s,work_queue)
 	// might be the same.  check and remove the duplicates if so
 	if (intercepts == 3)
 	{
-		if (close_enough(intercept_s[0], intercept_s[2]))
+		if (close_enough(_intercept_s[0], _intercept_s[2]))
 		{
 			intercepts--;
 		} else
-		if (close_enough(intercept_s[1], intercept_s[2]))
+		if (close_enough(_intercept_s[1], _intercept_s[2]))
 		{
 			intercepts--;
 		} else
-		if (close_enough(intercept_s[0], intercept_s[1]))
+		if (close_enough(_intercept_s[0], _intercept_s[1]))
 		{
-			intercept_s[1] = intercept_s[2];
-			intercept_t[1] = intercept_t[2];
+			// shift slot 2 down into slot 1
+			_intercept_s[1].x = _intercept_s[2].x;
+			_intercept_s[1].y = _intercept_s[2].y;
+			_intercept_s[1].z = _intercept_s[2].z;
+			_intercept_t[1].x = _intercept_t[2].x;
+			_intercept_t[1].y = _intercept_t[2].y;
+			_intercept_t[1].z = _intercept_t[2].z;
 			intercepts--;
 		} else {
 			// this should never happen, unless there are very small triangles
@@ -135,23 +138,23 @@ function occlude(t,s,work_queue)
 
 	if (intercepts == 2)
 	{
-		if (close_enough(intercept_s[0], intercept_s[1]))
+		if (close_enough(_intercept_s[0], _intercept_s[1]))
 			intercepts--;
 	}
 
 	// one intercept should mean that only one point is inside
 	if (intercepts == 1)
 	{
-		if (inside(tp0))
+		if (inside(_tp0))
 		{
 			// clipped from is0 to p1
-			s.p0 = intercept_s[0];
+			s.p0 = copyVec(_intercept_s[0]);
 			return tri_clipped;
 		}
-		if (inside(tp1))
+		if (inside(_tp1))
 		{
 			// clipped from p0 to is0
-			s.p1 = intercept_s[0];
+			s.p1 = copyVec(_intercept_s[0]);
 			return tri_clipped;
 		}
 
@@ -161,10 +164,10 @@ function occlude(t,s,work_queue)
 
 	// two intercept: figure out which intercept point is closer
 	// to which point and create a new segment
-	let d00 = dist2(intercept_s[0], s.p0);
-	let d01 = dist2(intercept_s[1], s.p0);
-	let d10 = dist2(intercept_s[0], s.p1);
-	let d11 = dist2(intercept_s[1], s.p1);
+	let d00 = dist2(_intercept_s[0], s.p0);
+	let d01 = dist2(_intercept_s[1], s.p0);
+	let d10 = dist2(_intercept_s[0], s.p1);
+	let d11 = dist2(_intercept_s[1], s.p1);
 
 	if (d00 < EPS && d11 < EPS)
 		return tri_hidden;
@@ -173,22 +176,22 @@ function occlude(t,s,work_queue)
 
 	if (d00 < EPS)
 	{
-		s.p0 = intercept_s[1];
+		s.p0 = copyVec(_intercept_s[1]);
 		return tri_clipped;
 	} else
 	if (d01 < EPS)
 	{
-		s.p0 = intercept_s[0];
+		s.p0 = copyVec(_intercept_s[0]);
 		return tri_clipped;
 	} else
 	if (d10 < EPS)
 	{
-		s.p1 = intercept_s[1];
+		s.p1 = copyVec(_intercept_s[1]);
 		return tri_clipped;
 	} else
 	if (d11 < EPS)
 	{
-		s.p1 = intercept_s[0];
+		s.p1 = copyVec(_intercept_s[0]);
 		return tri_clipped;
 	}
 
@@ -198,10 +201,10 @@ function occlude(t,s,work_queue)
 
 	work_queue.push({
 		p0: s.p0,
-		p1: intercept_s[midpoint],
+		p1: copyVec(_intercept_s[midpoint]),
 	});
 
-	s.p0 = intercept_s[midpoint ? 0 : 1];
+	s.p0 = copyVec(_intercept_s[midpoint ? 0 : 1]);
 
 	return tri_split;
 }
@@ -223,40 +226,39 @@ function dist2(p0,p1)
 }
 
 
-// returns the ratio along the segment of the intercept and if
-// this occurs on the segment both of the z points
-//
-// this solves only the 2D "orthographic" case for the X and Y
-// coordinates
-function intercept_lines(p0,p1,p2,p3)
+// Returns ratio along segment of the intercept, or -1 for no intersection.
+// Writes the 3D intersection points into out_s and out_t (pre-allocated).
+// Solves only the 2D orthographic case for X and Y, then interpolates Z.
+function intercept_lines(p0, p1, p2, p3, out_s, out_t)
 {
-	let s0 = p5.Vector.sub(p1,p0);
-	let s1 = p5.Vector.sub(p3,p2);
+	const s0x = p1.x - p0.x;
+	const s0y = p1.y - p0.y;
+	const s0z = p1.z - p0.z;
+	const s1x = p3.x - p2.x;
+	const s1y = p3.y - p2.y;
+	const s1z = p3.z - p2.z;
 
-	// compute s0 x s1
-	let d = s0.x * s1.y - s1.x * s0.y
+	const d = s0x * s1y - s1x * s0y;
 
-	// if they are close to parallel then we define that
-	// as non-intersecting
 	if (-EPS < d && d < EPS)
-		return [-1,null,null];
+		return -1;
 
-	// compute how far along each line they would intersect
-	let r0 = (s1.x * (p0.y - p2.y) - s1.y * (p0.x - p2.x)) / d;
-	let r1 = (s0.x * (p0.y - p2.y) - s0.y * (p0.x - p2.x)) / d;
+	const dy02 = p0.y - p2.y;
+	const dx02 = p0.x - p2.x;
+	const r0 = (s1x * dy02 - s1y * dx02) / d;
+	const r1 = (s0x * dy02 - s0y * dx02) / d;
 
-	// if they are outside of (0,1) then the intersection
-	// occurs outside of either segment and are non-intersecting
-	if (r0 < 0 || r0 > 1
-	||  r1 < 0 || r1 > 1)
-		return [-1,null,null];
+	if (r0 < 0 || r0 > 1 || r1 < 0 || r1 > 1)
+		return -1;
 
-	// compute the points of intersections for the two
-	// segments as p + r * s
-	s0.mult(r0).add(p0);
-	s1.mult(r1).add(p2);
+	out_s.x = p0.x + r0 * s0x;
+	out_s.y = p0.y + r0 * s0y;
+	out_s.z = p0.z + r0 * s0z;
+	out_t.x = p2.x + r1 * s1x;
+	out_t.y = p2.y + r1 * s1y;
+	out_t.z = p2.z + r1 * s1z;
 
-	return [r0, s0, s1];
+	return r0;
 }
 
 
@@ -277,7 +279,7 @@ function hidden_wire(s, screen_map, work_queue)
 	{
 		for(let y = min_key_y ; y <= max_key_y ; y++)
 		{
-			let triangles = screen_map[x + "," + y];
+			let triangles = screen_map[(x + stl_key2d_offset) * stl_key2d_span + (y + stl_key2d_offset)];
 			if (!triangles)
 				continue;
 

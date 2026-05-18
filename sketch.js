@@ -406,7 +406,7 @@ function draw()
 	text("  psi " + int(camera_psi * 180 / Math.PI), 10, 120);
 	text("    r " + int(camera_radius), 10, 140);
 
-	if (stl.segments.length == 0)
+	if (stl.seg_head >= stl.segments.length)
 	{
 		if (tri_per_sec == 0)
 			tri_per_sec = int(stl.triangles.length * 1000 / (performance.now() - start_time));
@@ -423,8 +423,8 @@ function draw()
 		stroke(200,0,200,100);
 	else
 		stroke(0,200,0);
-	for(let s of stl.segments)
-		v3_line(s.p0, s.p1);
+	for(let i = stl.seg_head; i < stl.segments.length; i++)
+		v3_line(stl.segments[i].p0, stl.segments[i].p1);
 
 	if (show_coplanar_edges)
 	{
@@ -433,7 +433,7 @@ function draw()
 			v3_line(s.p0, s.p1);
 	}
 
-	if (stl.segments.length != 0 || (redblue_mode && stl2.segments.length != 0))
+	if (stl.seg_head < stl.segments.length || (redblue_mode && stl2.seg_head < stl2.segments.length))
 	{
 		// if there are in process ones,
 		// draw an XYZ axis at the lookat
