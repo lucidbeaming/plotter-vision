@@ -23,7 +23,7 @@
 
     /* ── Panel ─────────────────────────────────────────────── */
     #panel {
-      width: 300px;
+      width: 360px;
       flex-shrink: 0;
       height: 100vh;
       background: rgba(16, 16, 16, 0.97);
@@ -243,6 +243,13 @@
           oninput="camera_radius=+this.value; syncControl('zoom',this.value); computeEye(); reproject=true;"/>
         <input type="number" class="val-input" id="zoom-num" min="20" max="400" value="170" step="1"
           oninput="camera_radius=+this.value; syncControl('zoom',this.value); computeEye(); reproject=true;"/>
+      </div>
+      <div class="row">
+        <label>Roll</label>
+        <input type="range" id="roll-slider" min="-180" max="180" value="0" step="1"
+          oninput="camera_roll=+this.value; syncControl('roll',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="roll-num" min="-180" max="180" value="0" step="1"
+          oninput="camera_roll=+this.value; syncControl('roll',this.value); computeEye(); reproject=true;"/>
       </div>
       <div class="row">
         <label>Pan X</label>

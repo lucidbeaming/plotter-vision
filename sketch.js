@@ -45,6 +45,7 @@ reproject = false;
 let camera_psi = 0;
 let camera_theta = 0;
 let camera_radius = 100;
+let camera_roll = 0; // degrees, rotates camera around its view axis
 
 function computeEye()
 {
@@ -65,12 +66,31 @@ function computeEye()
 	camera.eye.y = camera_radius * Math.sin(camera_theta) * Math.cos(camera_psi);
 	camera.eye.z = camera_radius * Math.cos(camera_theta);
 
-	if (camera_theta < 0)
-		camera.up.z = -1;
-	else
-		camera.up.z = +1;
+	// Reset up vector fully before applying roll (x/y may be non-zero from prior frame)
+	camera.up.x = 0;
+	camera.up.y = 0;
+	camera.up.z = camera_theta < 0 ? -1 : 1;
 
 	camera.eye.add(camera.lookat);
+
+	if (camera_roll !== 0) {
+		// Rotate the up vector around the view axis (eye → lookat) using
+		// Rodrigues' rotation formula: v' = v·cosθ + (k×v)·sinθ + k·(k·v)·(1−cosθ)
+		const angle = camera_roll * Math.PI / 180;
+		const dx = camera.lookat.x - camera.eye.x;
+		const dy = camera.lookat.y - camera.eye.y;
+		const dz = camera.lookat.z - camera.eye.z;
+		const dl = Math.sqrt(dx*dx + dy*dy + dz*dz);
+		const kx = dx/dl, ky = dy/dl, kz = dz/dl;
+		const uz = camera.up.z; // (0, 0, ±1)
+		const c = Math.cos(angle), s = Math.sin(angle);
+		const kdotv = kz * uz; // k · (0,0,uz)
+		const cvx = ky * uz, cvy = -kx * uz; // k × (0,0,uz), z-component is 0
+		camera.up.x = cvx*s + kx*kdotv*(1-c);
+		camera.up.y = cvy*s + ky*kdotv*(1-c);
+		camera.up.z = uz*c  + kz*kdotv*(1-c);
+	}
+
 	camera.update_matrix();
 
 	// duplicate for 3D (lookat is shared)
