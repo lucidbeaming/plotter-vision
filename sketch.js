@@ -42,19 +42,9 @@ let camera2; // for 3D
 eye_separation = 2;
 redraw = false;
 reproject = false;
-let vx = 0;
-let vy = 0;
-let vz = 0;
-let last_x = 0;
-let last_y = 0;
-let move_lookat = false;
-
 let camera_psi = 0;
 let camera_theta = 0;
 let camera_radius = 100;
-
-let start_time = 0;
-let tri_per_sec = 0;
 
 function computeEye()
 {
@@ -230,40 +220,26 @@ function drawAxis(camera, lookat)
 	}
 }
 
-function keyReleased()
-{
-	vx = vy = vz = 0;
-	move_lookat = false;
-}
 
-function keyPressed()
-{
-console.log(keyCode);
-	if (keyCode == SHIFT)
-		move_lookat = true;
-
-	if (keyCode == LEFT_ARROW)
-		vx = -10;
-	else
-	if (keyCode == RIGHT_ARROW)
-		vx = +10;
-
-	if (keyCode == UP_ARROW)
-		vz = -10;
-	else
-	if (keyCode == DOWN_ARROW)
-		vz = +10;
-
-
-	//return false;
-}
-
-function cameraView(theta,psi)
+function cameraView(theta, psi)
 {
 	camera_theta = theta * Math.PI / 180;
 	camera_psi = psi * Math.PI / 180;
 	computeEye();
 	reproject = true;
+
+	// sync panel sliders
+	const ts = document.getElementById('theta-slider');
+	if (!ts) return;
+	ts.value = theta;
+	document.getElementById('theta-val').textContent = int(theta);
+
+	let pn = psi % 360;
+	if (pn > 180) pn -= 360;
+	if (pn < -180) pn += 360;
+	const ps = document.getElementById('psi-slider');
+	ps.value = pn;
+	document.getElementById('psi-val').textContent = int(pn);
 }
 
 function keyTyped()
@@ -299,13 +275,15 @@ function keyTyped()
 
 function mouseWheel(event)
 {
-	vz = event.delta * 0.5;
-}
- 
-function mousePressed()
-{
-	last_x = mouseX;
-	last_y = mouseY;
+	camera_radius = Math.max(1, camera_radius + event.delta * 0.5);
+	const zs = document.getElementById('zoom-slider');
+	if (zs) {
+		zs.value = camera_radius;
+		document.getElementById('zoom-val').textContent = int(camera_radius);
+	}
+	computeEye();
+	reproject = true;
+	return false;
 }
 
 function windowResized() {
@@ -323,36 +301,6 @@ function draw()
 	if (!stl)
 		return;
 
-	if (mouseIsPressed && mouseY >= 0)
-	{
-		vx = (mouseX - last_x) * 0.5;
-		vy = (mouseY - last_y) * 0.5;
-		last_x = mouseX;
-		last_y = mouseY;
-	}
-	if (vx != 0 || vy != 0 || vz != 0)
-	{
-		camera_radius += vz;
-		if (camera_radius <= 0)
-			camera_radius = 1;
-
-		if (move_lookat)
-		{
-			camera.lookat.x += vx;
-			camera.lookat.z += vy;
-		} else {
-			camera_psi += vx * 0.01;
-			camera_theta -= vy * 0.01;
-
-		}
-
-		computeEye();
-		reproject = true;
-		vx = 0;
-		vy = 0;
-		vz = 0;
-	}
-
 	// if there are segments left to process, continue to force redraw
 	if (!stl || !(redraw || reproject))
 		return;
@@ -366,21 +314,11 @@ function draw()
 		stl.project(camera);
 		if (redblue_mode)
 			stl2.project(camera2);
-		start_time = performance.now();
-		tri_per_sec = 0;
 	}
 
-	// they are dragging; do not try to do any additional work
-	// and only compute the alterntate view if we're in 3D mode
-	// if there was work done, return true to force another
-	// pass through the draw loop.
-	if (!mouseIsPressed)
-	{
-		if (redblue_mode)
-			stl2.do_work(camera2, 200);
-
-		stl.do_work(camera, 200);
-	}
+	if (redblue_mode)
+		stl2.do_work(camera2, 200);
+	stl.do_work(camera, 200);
 
 	if (dark_mode)
 	{
@@ -395,24 +333,6 @@ function draw()
 	textSize(128);
 	textAlign(RIGHT, BOTTOM);
 	text("plotter.vision", width, height);
-
-	fill(dark_mode ? 150 : 80);
-	textSize(12);
-	textAlign(LEFT, BOTTOM);
-
-	text("camera " + int(camera.eye.x) + "," + int(camera.eye.y) + "," + int(camera.eye.z), 10, 30);
-	text("lookat " + int(camera.lookat.x) + "," + int(camera.lookat.y) + "," + int(camera.lookat.z), 10, 50);
-
-	text("theta " + int(camera_theta * 180 / Math.PI), 10, 100);
-	text("  psi " + int(camera_psi * 180 / Math.PI), 10, 120);
-	text("    r " + int(camera_radius), 10, 140);
-
-	if (stl.seg_head >= stl.segments.length)
-	{
-		if (tri_per_sec == 0)
-			tri_per_sec = int(stl.triangles.length * 1000 / (performance.now() - start_time));
-		text("tri/s " + tri_per_sec, 10, 180);
-	}
 
 	push();
 	translate(x_offset, y_offset);

@@ -209,6 +209,18 @@
         <button class="btn" onclick="cameraPreset('iso')">Iso</button>
       </div>
       <div class="row">
+        <label>Elevation</label>
+        <input type="range" id="theta-slider" min="1" max="179" value="70"
+          oninput="camera_theta=this.value*Math.PI/180; document.getElementById('theta-val').textContent=int(this.value); computeEye(); reproject=true;"/>
+        <span class="val" id="theta-val">70</span>
+      </div>
+      <div class="row">
+        <label>Azimuth</label>
+        <input type="range" id="psi-slider" min="-180" max="180" value="-150"
+          oninput="camera_psi=this.value*Math.PI/180; document.getElementById('psi-val').textContent=int(this.value); computeEye(); reproject=true;"/>
+        <span class="val" id="psi-val">-150</span>
+      </div>
+      <div class="row">
         <label>Zoom</label>
         <input type="range" id="zoom-slider" min="20" max="400" value="170"
           oninput="camera_radius=+this.value; document.getElementById('zoom-val').textContent=this.value; computeEye(); reproject=true;"/>
