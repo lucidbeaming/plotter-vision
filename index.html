@@ -273,6 +273,19 @@
         <span class="val" id="area-val">2</span>
       </div>
       <div class="row">
+        <label>Mesh simplify</label>
+        <input type="range" id="simplify-slider" min="0" max="20" value="0" step="0.5"
+          oninput="
+            if(!stl) return;
+            const v = +this.value;
+            document.getElementById('simplify-val').textContent = v.toFixed(1);
+            stl.simplify(v);
+            if(stl2) stl2.simplify(v);
+            reproject=true;
+          "/>
+        <span class="val" id="simplify-val">0</span>
+      </div>
+      <div class="row">
         <label>Coplanar edges</label>
         <button class="btn" id="coplanar-btn"
           onclick="show_coplanar_edges=!show_coplanar_edges;

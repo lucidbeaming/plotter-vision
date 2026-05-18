@@ -145,37 +145,84 @@ function STL(content)
 		v.z = (v.z - mz) * s;
 	}
 
+	// store normalized vertex positions (plain objects) so simplify() can
+	// rebuild from the original mesh without keeping full Triangle state
+	this.base_vertices = vertex.map(v => ({x: v.x, y: v.y, z: v.z}));
+
 	this.triangles = vertex2triangles(vertex);
 
 	// trade some accuracy for faster rendering and better drawing
 	this.min_length = 5;
 
-	// map the STL vertices within a fraction of a pixel
-	// so that coplanar mapping can be done much more quickly.
 	this.done_coplanar = 0;
 	this.model_map = {};
+	this._build_model_map();
 
-	for(let t of this.triangles)
-	{
-		let k0 = stl_key3d(t.model[0]);
-		let k1 = stl_key3d(t.model[1]);
-		let k2 = stl_key3d(t.model[2]);
+	// ── Mesh simplification via vertex clustering ──────────────
+	// Divides the 3D model space into a grid; vertices in the same
+	// cell are replaced by their centroid.  Triangles that collapse
+	// (two or more vertices land in the same cell) are discarded.
+	// cellSize is in model units (model is normalised to 100×100×100).
+	// cellSize 0 resets to the original full-resolution mesh.
+	this.simplify = function(cellSize) {
+		const bv = this.base_vertices;
+		let snapVec;
 
-		if(this.model_map[k0])
-			this.model_map[k0].push(t);
-		else
-			this.model_map[k0] = [t];
+		if (cellSize > 0) {
+			const getKey = (v) =>
+				Math.floor(v.x / cellSize) + ',' +
+				Math.floor(v.y / cellSize) + ',' +
+				Math.floor(v.z / cellSize);
 
-		if(this.model_map[k1])
-			this.model_map[k1].push(t);
-		else
-			this.model_map[k1] = [t];
+			// accumulate vertex positions per cell
+			const cellMap = new Map();
+			for (const v of bv) {
+				const k = getKey(v);
+				if (!cellMap.has(k)) cellMap.set(k, {x:0, y:0, z:0, n:0});
+				const c = cellMap.get(k);
+				c.x += v.x; c.y += v.y; c.z += v.z; c.n++;
+			}
+			// replace each cell with its centroid
+			for (const c of cellMap.values()) {
+				c.x /= c.n; c.y /= c.n; c.z /= c.n;
+			}
 
-		if(this.model_map[k2])
-			this.model_map[k2].push(t);
-		else
-			this.model_map[k2] = [t];
-	}
+			snapVec = (v) => {
+				const c = cellMap.get(getKey(v));
+				return createVector(c.x, c.y, c.z);
+			};
+		} else {
+			snapVec = (v) => createVector(v.x, v.y, v.z);
+		}
+
+		// rebuild triangle list, skipping any that collapsed
+		const tris = [];
+		for (let i = 0; i < bv.length; i += 3) {
+			const p0 = snapVec(bv[i]);
+			const p1 = snapVec(bv[i+1]);
+			const p2 = snapVec(bv[i+2]);
+			// degenerate check: two vertices at identical positions
+			if (p0.x===p1.x && p0.y===p1.y && p0.z===p1.z) continue;
+			if (p1.x===p2.x && p1.y===p2.y && p1.z===p2.z) continue;
+			if (p0.x===p2.x && p0.y===p2.y && p0.z===p2.z) continue;
+			tris.push(new Triangle(p0, p1, p2));
+		}
+		this.triangles = tris;
+		this.done_coplanar = 0;
+		this._build_model_map();
+	};
+
+	// helper: (re)build model_map from current this.triangles
+	this._build_model_map = function() {
+		this.model_map = {};
+		for (const t of this.triangles) {
+			for (const p of t.model) {
+				const k = stl_key3d(p);
+				if (this.model_map[k]) this.model_map[k].push(t);
+				else this.model_map[k] = [t];
+			}
+		}
+	};
 
 	this.project = function(camera)
 	{
