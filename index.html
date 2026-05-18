@@ -23,7 +23,7 @@
 
     /* ── Panel ─────────────────────────────────────────────── */
     #panel {
-      width: 256px;
+      width: 300px;
       flex-shrink: 0;
       height: 100vh;
       background: rgba(16, 16, 16, 0.97);
@@ -57,17 +57,26 @@
     }
 
     .row label {
-      flex: 1;
+      width: 90px;
+      flex-shrink: 0;
       color: #999;
       white-space: nowrap;
+      font-size: 11px;
     }
 
-    .val {
-      min-width: 28px;
+    /* Editable numeric display paired with each slider */
+    input[type="number"].val-input {
+      width: 54px;
+      flex-shrink: 0;
       text-align: right;
-      color: #666;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 3px;
+      color: #ccc;
       font-size: 11px;
+      font-family: inherit;
       font-variant-numeric: tabular-nums;
+      padding: 1px 4px;
     }
 
     /* ── Buttons ───────────────────────────────────────────── */
@@ -154,6 +163,12 @@
       color: #0055cc;
     }
 
+    body.light input[type="number"].val-input {
+      background: rgba(0,0,0,0.05);
+      border-color: rgba(0,0,0,0.1);
+      color: #333;
+    }
+
     body.light input[type="number"],
     body.light select {
       background: rgba(0,0,0,0.05);
@@ -210,21 +225,38 @@
       </div>
       <div class="row">
         <label>Elevation</label>
-        <input type="range" id="theta-slider" min="1" max="179" value="70"
-          oninput="camera_theta=this.value*Math.PI/180; document.getElementById('theta-val').textContent=int(this.value); computeEye(); reproject=true;"/>
-        <span class="val" id="theta-val">70</span>
+        <input type="range" id="theta-slider" min="1" max="179" value="70" step="1"
+          oninput="camera_theta=this.value*Math.PI/180; syncControl('theta',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="theta-num" min="1" max="179" value="70" step="1"
+          oninput="camera_theta=this.value*Math.PI/180; syncControl('theta',this.value); computeEye(); reproject=true;"/>
       </div>
       <div class="row">
         <label>Azimuth</label>
-        <input type="range" id="psi-slider" min="-180" max="180" value="-150"
-          oninput="camera_psi=this.value*Math.PI/180; document.getElementById('psi-val').textContent=int(this.value); computeEye(); reproject=true;"/>
-        <span class="val" id="psi-val">-150</span>
+        <input type="range" id="psi-slider" min="-180" max="180" value="-150" step="1"
+          oninput="camera_psi=this.value*Math.PI/180; syncControl('psi',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="psi-num" min="-180" max="180" value="-150" step="1"
+          oninput="camera_psi=this.value*Math.PI/180; syncControl('psi',this.value); computeEye(); reproject=true;"/>
       </div>
       <div class="row">
         <label>Zoom</label>
-        <input type="range" id="zoom-slider" min="20" max="400" value="170"
-          oninput="camera_radius=+this.value; document.getElementById('zoom-val').textContent=this.value; computeEye(); reproject=true;"/>
-        <span class="val" id="zoom-val">170</span>
+        <input type="range" id="zoom-slider" min="20" max="400" value="170" step="1"
+          oninput="camera_radius=+this.value; syncControl('zoom',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="zoom-num" min="20" max="400" value="170" step="1"
+          oninput="camera_radius=+this.value; syncControl('zoom',this.value); computeEye(); reproject=true;"/>
+      </div>
+      <div class="row">
+        <label>Pan X</label>
+        <input type="range" id="pan-x-slider" min="-50" max="50" value="0" step="1"
+          oninput="camera.lookat.x=+this.value; syncControl('pan-x',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="pan-x-num" min="-50" max="50" value="0" step="1"
+          oninput="camera.lookat.x=+this.value; syncControl('pan-x',this.value); computeEye(); reproject=true;"/>
+      </div>
+      <div class="row">
+        <label>Pan Z</label>
+        <input type="range" id="pan-z-slider" min="-50" max="50" value="0" step="1"
+          oninput="camera.lookat.z=+this.value; syncControl('pan-z',this.value); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="pan-z-num" min="-50" max="50" value="0" step="1"
+          oninput="camera.lookat.z=+this.value; syncControl('pan-z',this.value); computeEye(); reproject=true;"/>
       </div>
     </div>
 
@@ -238,9 +270,10 @@
       </div>
       <div class="row">
         <label>Width</label>
-        <input type="range" min="1" max="60" value="10" step="1"
-          oninput="stroke_width=this.value/10; document.getElementById('sw-val').textContent=(stroke_width).toFixed(1); redraw=true;"/>
-        <span class="val" id="sw-val">1.0</span>
+        <input type="range" id="sw-slider" min="0.1" max="6" value="1" step="0.1"
+          oninput="stroke_width=+this.value; syncControl('sw',this.value,1); redraw=true;"/>
+        <input type="number" class="val-input" id="sw-num" min="0.1" max="6" value="1" step="0.1"
+          oninput="stroke_width=+this.value; syncControl('sw',this.value,1); redraw=true;"/>
       </div>
       <div class="row">
         <label>Dark background</label>
@@ -269,9 +302,10 @@
       </div>
       <div class="row" id="eye-row" style="display:none">
         <label>Eye sep.</label>
-        <input type="range" min="1" max="60" value="20"
-          oninput="eye_separation=this.value/10; document.getElementById('eye-val').textContent=(eye_separation).toFixed(1); computeEye(); reproject=true;"/>
-        <span class="val" id="eye-val">2.0</span>
+        <input type="range" id="eye-sep-slider" min="0.1" max="6" value="2" step="0.1"
+          oninput="eye_separation=+this.value; syncControl('eye-sep',this.value,1); computeEye(); reproject=true;"/>
+        <input type="number" class="val-input" id="eye-sep-num" min="0.1" max="6" value="2" step="0.1"
+          oninput="eye_separation=+this.value; syncControl('eye-sep',this.value,1); computeEye(); reproject=true;"/>
       </div>
     </div>
 
@@ -279,23 +313,18 @@
     <div class="section">
       <h3>Rendering</h3>
       <div class="row">
-        <label>Min triangle area</label>
-        <input type="range" min="1" max="200" value="2"
-          oninput="min_area_threshold=+this.value; document.getElementById('area-val').textContent=this.value; reproject=true;"/>
-        <span class="val" id="area-val">2</span>
+        <label>Min area</label>
+        <input type="range" id="area-slider" min="1" max="200" value="2" step="1"
+          oninput="min_area_threshold=+this.value; syncControl('area',this.value); reproject=true;"/>
+        <input type="number" class="val-input" id="area-num" min="1" max="200" value="2" step="1"
+          oninput="min_area_threshold=+this.value; syncControl('area',this.value); reproject=true;"/>
       </div>
       <div class="row">
-        <label>Mesh simplify</label>
+        <label>Simplify</label>
         <input type="range" id="simplify-slider" min="0" max="20" value="0" step="0.5"
-          oninput="
-            if(!stl) return;
-            const v = +this.value;
-            document.getElementById('simplify-val').textContent = v.toFixed(1);
-            stl.simplify(v);
-            if(stl2) stl2.simplify(v);
-            reproject=true;
-          "/>
-        <span class="val" id="simplify-val">0</span>
+          oninput="if(!stl) return; const v=+this.value; syncControl('simplify',v,1); stl.simplify(v); if(stl2) stl2.simplify(v); reproject=true;"/>
+        <input type="number" class="val-input" id="simplify-num" min="0" max="20" value="0" step="0.5"
+          oninput="if(!stl) return; const v=+this.value; syncControl('simplify',v,1); stl.simplify(v); if(stl2) stl2.simplify(v); reproject=true;"/>
       </div>
       <div class="row">
         <label>Coplanar edges</label>
@@ -350,6 +379,17 @@
     filename = file.name;
     reader.readAsArrayBuffer(file);
   };
+
+  // ── Slider / number-input sync ──────────────────────────────
+  // Keeps the paired slider and number input in step with each other.
+  // Call from either input's oninput; the one being edited is skipped.
+  function syncControl(id, val, dec) {
+    const s = document.getElementById(id + '-slider');
+    const n = document.getElementById(id + '-num');
+    const fmt = dec > 0 ? (+val).toFixed(dec) : String(Math.round(+val));
+    if (s && s !== document.activeElement) s.value = +val;
+    if (n && n !== document.activeElement) n.value = fmt;
+  }
 
   // ── Camera presets ──────────────────────────────────────────
   function cameraPreset(view) {

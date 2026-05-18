@@ -228,18 +228,12 @@ function cameraView(theta, psi)
 	computeEye();
 	reproject = true;
 
-	// sync panel sliders
-	const ts = document.getElementById('theta-slider');
-	if (!ts) return;
-	ts.value = theta;
-	document.getElementById('theta-val').textContent = int(theta);
-
+	if (typeof syncControl !== 'function') return;
 	let pn = psi % 360;
 	if (pn > 180) pn -= 360;
 	if (pn < -180) pn += 360;
-	const ps = document.getElementById('psi-slider');
-	ps.value = pn;
-	document.getElementById('psi-val').textContent = int(pn);
+	syncControl('theta', theta);
+	syncControl('psi', pn);
 }
 
 function keyTyped()
@@ -275,12 +269,8 @@ function keyTyped()
 
 function mouseWheel(event)
 {
-	camera_radius = Math.max(1, camera_radius + event.delta * 0.5);
-	const zs = document.getElementById('zoom-slider');
-	if (zs) {
-		zs.value = camera_radius;
-		document.getElementById('zoom-val').textContent = int(camera_radius);
-	}
+	camera_radius = Math.max(20, Math.min(400, camera_radius + event.delta * 0.5));
+	if (typeof syncControl === 'function') syncControl('zoom', int(camera_radius));
 	computeEye();
 	reproject = true;
 	return false;
